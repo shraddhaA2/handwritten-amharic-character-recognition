@@ -1,0 +1,6 @@
+{
+  "name": "Handwritten Amharic Character Recognition",
+  "description": "An academic system for recognizing handwritten Amharic characters using hybrid CNN feature extraction (AlexNet, VGG16, VGG19, ResNet50) and machine learning classifiers (SVM, Random Forest, XGBoost).",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
