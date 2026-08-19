@@ -1,0 +1,5 @@
+Model,Backbone,Classifier,Accuracy,Precision,Recall,F1_Score
+ResNet50 + SVM,ResNet50 (Pretrained ImageNet),SVM (RBF Kernel),94.28%,0.9442,0.9428,0.9431
+Raw Pixels + SVM,None (Flattened 28x28),SVM (RBF Kernel),71.35%,0.7180,0.7135,0.7142
+ResNet18 + SVM,ResNet18 (Pretrained),SVM (RBF Kernel),90.12%,0.9025,0.9012,0.9015
+Custom CNN (Scratch),4-Layer ConvNet,Softmax Dense Head,83.40%,0.8360,0.8340,0.8345

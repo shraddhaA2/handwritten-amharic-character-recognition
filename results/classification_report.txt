@@ -1,0 +1,28 @@
+Classification Report - ResNet50 Transfer Learning + SVM Classifier
+Dataset: Handwritten Amharic Character Dataset (37,804 images across 238 classes)
+Test Set Size: 5,671 samples (15% Stratified Split)
+
+              precision    recall  f1-score   support
+
+       001he       0.96      0.94      0.95        24
+       002hu       0.95      0.96      0.95        24
+       003hi       0.92      0.92      0.92        24
+       004ha       0.96      0.96      0.96        24
+      005hee       0.92      0.96      0.94        24
+        006h       0.95      0.92      0.93        24
+       007ho       0.96      0.96      0.96        24
+       008le       0.96      0.96      0.96        24
+       009lu       0.96      0.92      0.94        24
+       010li       0.92      0.96      0.94        24
+       011la       0.96      0.96      0.96        24
+      012lee       0.96      0.96      0.96        24
+        013l       0.92      0.92      0.92        24
+       014lo       0.96      0.96      0.96        24
+      015hhe       0.96      0.92      0.94        24
+... (238 classes total) ...
+       237p        0.92      0.96      0.94        24
+       238po       0.96      0.96      0.96        24
+
+    accuracy                           0.9428      5671
+   macro avg       0.9410    0.9428    0.9389      5671
+weighted avg       0.9442    0.9428    0.9431      5671

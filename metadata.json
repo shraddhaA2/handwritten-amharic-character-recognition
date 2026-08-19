@@ -1,0 +1,7 @@
+{
+  "name": "Handwritten Amharic Character Recognition",
+  "description": "Handwritten Amharic Character Recognition using ResNet50 Transfer Learning feature extraction and SVM Classification on the 238-class Amharic dataset.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

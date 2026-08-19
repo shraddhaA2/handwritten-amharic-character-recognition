@@ -1,0 +1,30 @@
+{
+  "dataset_samples": 37652,
+  "classes": 238,
+  "feature_dimension": 2048,
+  "classifier": {
+    "SVM": {
+      "type": "LinearSVC",
+      "kernel": "linear",
+      "C": 1.0,
+      "probability_calibration": false
+    },
+    "Random Forest": {
+      "n_estimators": 100
+    },
+    "XGBoost": {
+      "n_estimators": 200,
+      "max_depth": 6,
+      "learning_rate": 0.1
+    }
+  },
+  "validation_accuracy": {
+    "SVM": 0.47910764872521244,
+    "Random Forest": 0.2535410764872521,
+    "XGBoost": null
+  },
+  "test_accuracy": {
+    "SVM": 0.4801699716713881,
+    "Random Forest": 0.2507082152974504
+  }
+}
