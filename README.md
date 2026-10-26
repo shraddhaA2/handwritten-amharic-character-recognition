@@ -1,226 +1,228 @@
-# Handwritten Amharic Character Recognition Through Transfer Learning
+# Handwritten Amharic Character Recognition (HACR) Through Transfer Learning
 
-**Integrating CNN Models (ResNet50) and Machine Learning Classifiers (SVM)**
-
----
-
-## 1. Project Title & Objective
-
-### Title
-**Handwritten Amharic Character Recognition Through Transfer Learning: Integrating Pretrained CNN Feature Extraction and Support Vector Machine Classifiers**
-
-### Objective
-To build an accurate, reproducible, and computationally efficient machine learning pipeline for recognizing handwritten Amharic characters across all **238 character classes** (34 base consonants × 7 vowel orders). The system leverages **Transfer Learning** by using a deep ImageNet-pretrained **ResNet50** convolutional neural network to extract 2,048-dimensional feature representations from preprocessed handwritten strokes, which are subsequently classified using a **Support Vector Machine (SVM)** with an RBF kernel.
+An end-to-end Machine Learning system and Web Application for offline **Handwritten Amharic Character Recognition** across **238 character classes** using deep feature representations from a pretrained **ResNet50** convolutional neural network and a **Linear Support Vector Machine (LinearSVC)** classifier.
 
 ---
 
-## 2. Dataset Description & Statistics
+## 1. Project Overview & Architecture
 
-The dataset is obtained from the standard benchmark:
-[Fetulhak/Handwritten-Amharic-character-Dataset](https://github.com/Fetulhak/Handwritten-Amharic-character-Dataset.git)
+Amharic uses the **Ethiopic (Ge'ez)** script, an abugida writing system consisting of **34 base consonants**, each modified by vocalic inflection into **7 vowel orders**:
+$$\text{Total Classes} = 34 \text{ base families} \times 7 \text{ orders} = 238 \text{ unique characters}$$
 
-- **Total Images**: **37,804 images**
-  - Dataset 1: 18,902 images
-  - Dataset 2: 18,902 images
-- **Number of Categories**: **238 unique classes** (34 base consonant families × 7 vowel orders)
-- **Image Resolution**: 28 × 28 pixels
-- **Color Mode**: Grayscale / Luminance
-- **Format**: JPEG
-- **Data Collection Details**: Cropped from scanned handwriting forms contributed by individuals across diverse age ranges, education levels, and both right- and left-handed writers.
-- **Filename Convention**: `<category_identifier>.<sample_index>.jpg` (e.g. `001he.1.jpg`, `001he.137.jpg`, `238po.93.jpg`).
-
----
-
-## 3. System Architecture & Methodology
-
-The machine learning workflow follows a multi-stage transfer learning pipeline:
+### Transfer Learning Pipeline
 
 ```
-[ Handwritten Character Image (28×28 Grayscale) ]
-                        ↓
-            [ Preprocessing Pipeline ]
-  1. Grayscale conversion & noise reduction (Gaussian blur)
-  2. Adaptive Otsu binarization
-  3. Stroke contour bounding-box detection & aspect-ratio padding
-  4. Resizing to 224 × 224 pixels & 3-channel expansion
-  5. ImageNet normalization (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-                        ↓
-         [ Pretrained ResNet50 Backbone ]
+[ Input Handwritten Character Image (28×28 Grayscale) ]
+                           ↓
+              [ Image Preprocessing ]
+  1. Grayscale luminance conversion (0.299R + 0.587G + 0.114B)
+  2. Gaussian smoothing (3×3 kernel)
+  3. Adaptive Otsu binarization & foreground stroke isolation
+  4. Stroke bounding box detection with aspect-ratio square padding
+  5. Resizing to 224 × 224 pixels & 3-channel expansion
+  6. ImageNet normalization (mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                           ↓
+          [ Pretrained ResNet50 Backbone ]
   - Torchvision ResNet50 (ImageNet Pretrained Weights)
-  - All convolution & residual layer parameters frozen (requires_grad=False)
-  - Penultimate Global Average Pooling Layer (fc head removed)
-                        ↓
-         [ 2048-Dimensional Deep Feature Vector ]
-                        ↓
-         [ Support Vector Machine (SVM) ]
-  - Kernel: Radial Basis Function (RBF)
-  - Hyperparameters: C=10.0, gamma='scale'
-  - Multi-class strategy: One-vs-Rest / Platt probability scaling
-                        ↓
-    [ Predicted Class (e.g. "001he" / "ሀ") & Confidence Score ]
+  - Convolutional layers frozen (requires_grad = False)
+  - Global Average Pooling layer (2048-d continuous embedding)
+                           ↓
+             [ Linear SVM Classifier ]
+  - Multi-class LinearSVC (One-vs-Rest hyperplanes across 238 classes)
+  - Evaluates decision margin scores for all 238 classes
+                           ↓
+             [ Ethiopic Fidel Mapping ]
+  - Predicted class index (0–237) mapped to Amharic character glyph (e.g. "ሀ"),
+    phonetic sound ("he"), base family ("ሀ"), and vowel order ("Ge'ez 1st")
 ```
 
 ---
 
-## 4. Technology Stack
+## 2. Requirements & Prerequisites
 
-- **ML Frameworks**: PyTorch, Torchvision, Scikit-learn, Joblib
-- **Computer Vision & Image Processing**: OpenCV (`opencv-python-headless`), Pillow (`PIL`), NumPy, Pandas
-- **Backend APIs**: FastAPI, Uvicorn, Python-Multipart, Pydantic, Express (Node.js)
-- **Frontend UI**: React 19, TypeScript, Tailwind CSS, Motion, Lucide Icons
-
----
-
-## 5. Project Directory Structure
-
-```
-project/
-├── backend/
-│   └── main.py                     # FastAPI backend application
-├── data/
-│   ├── metadata.csv                # Stratified 70/15/15 train/val/test splits
-│   └── raw/                        # Extracted raw dataset folders
-├── ml/
-│   ├── config.py                   # Global ML constants, paths, and 238-class map
-│   ├── dataset.py                  # Automatic category discovery & dataset loader
-│   ├── preprocessing.py            # Consistent 5-stage image preprocessing
-│   ├── feature_extractor.py        # ResNet50 2048-d feature extractor
-│   ├── train.py                    # End-to-end training & feature caching pipeline
-│   ├── predict.py                  # Standalone inference & CLI module
-│   ├── evaluate.py                 # Standalone evaluation & test set report generator
-│   └── categories.json             # 238-class Amharic mapping configuration
-├── models/
-│   ├── resnet50_features/          # Cached .npy features for instant retraining
-│   ├── svm_model.joblib            # Trained SVM classifier binary
-│   ├── label_encoder.joblib        # Scikit-learn LabelEncoder
-│   └── metadata.json               # Model training metadata & parameters
-├── results/
-│   ├── classification_report.txt   # Detailed per-class precision, recall, F1
-│   ├── confusion_matrix.png        # Confusion matrix visual plot
-│   ├── model_comparison.csv        # Benchmark comparison against baseline models
-│   └── results.json                # Summary metrics JSON
-├── src/                            # React Web Application
-│   ├── components/                 # Canvas, Upload, Prediction, Inspector, Explorer
-│   ├── data/                       # Category definitions & sample presets
-│   ├── App.tsx                     # Main interactive application UI
-│   └── types.ts                    # TypeScript type definitions
-├── server.ts                       # Full-stack Node.js server with Vite middleware
-├── requirements.txt                # Python ML dependencies
-├── package.json                    # Node dependencies & build scripts
-└── README.md                       # Documentation
-```
+- **Python**: `3.10` to `3.12`
+- **Node.js**: `v18+` or `v20+` (with npm)
+- **Operating System**: Windows, Linux, or macOS
 
 ---
 
-## 6. Step-by-Step Execution Guide
+## 3. Quick Start & Execution Guide
 
 ### Step 1: Install Dependencies
 
 ```bash
-# Install Python ML dependencies
+# 1. Install Python ML & backend dependencies
 pip install -r requirements.txt
 
-# Install Node.js frontend dependencies (if not already installed)
+# 2. Install Frontend dependencies
 npm install
 ```
 
-### Step 2: Prepare the Dataset & Generate Stratified Splits
+### Step 2: Start the System (Two Commands)
 
-Place the downloaded dataset folders (`Amharic Character Dataset 1` and `Amharic Character Dataset 2`) in the project root or inside `data/raw/`. Then run:
+Open two terminal windows:
+
+#### Terminal 1 — Start the Python FastAPI Backend:
+```bash
+uvicorn backend.main:app --port 8000 --reload
+```
+*Backend runs at:* `http://localhost:8000` (API docs at `http://localhost:8000/docs`)
+
+#### Terminal 2 — Start the React Web Frontend:
+```bash
+npm run dev
+```
+*Frontend runs at:* `http://localhost:3000`
+
+---
+
+## 4. Testing & Inference via CLI
+
+You can test single character images directly from the command line without starting the web server:
 
 ```bash
-python -m ml.dataset
+# Test sample 'ሀ' (he, Class 001he)
+python -m ml.predict data/samples/001he.1.jpg
+
+# Test sample 'ፈ' (fe, Class 225fe)
+python -m ml.predict data/samples/225fe.134.jpg
 ```
 
-This script:
-1. Discovers all 238 unique category identifiers automatically.
-2. Creates `data/metadata.csv` with a reproducible **70% Training / 15% Validation / 15% Testing** stratified split using random seed `42`.
+Example CLI Output:
+```
+=================================================================
+HANDWRITTEN AMHARIC CHARACTER RECOGNITION (HACR)
+=================================================================
+Input Image         : data/samples/001he.1.jpg
+Predicted Character : ሀ (Phonetic: 'he')
+Base Consonant      : ሀ
+Vowel Order         : Ge'ez (1st)
+Class Identifier    : 001he (ID: 0)
+Confidence (Softmax): 2.86%
+SVM Decision Score  : -0.0830
 
-### Step 3: Train ResNet50 + SVM Model
-
-```bash
-python -m ml.train
+Top 5 Candidates:
+  1. ሀ (he)  | Label: 001he    | Conf:  2.86% | Score: -0.0830
+  2. ዊ (wi)  | Label: 136wi    | Conf:  1.35% | Score: -0.8338
+  3. ህ (h)   | Label: 006hh    | Conf:  1.26% | Score: -0.8986
+  4. ዐ (ae)  | Label: 141_x    | Conf:  1.22% | Score: -0.9313
+  5. ዔ (aee) | Label: 145_x    | Conf:  1.14% | Score: -1.0018
+=================================================================
 ```
 
-This script:
-1. Loads images according to `data/metadata.csv`.
-2. Preprocesses images and extracts 2,048-dimensional feature vectors using ImageNet-pretrained ResNet50.
-3. Caches extracted features to `models/resnet50_features/` (allowing instant future SVM hyperparameter tuning without re-extracting CNN features).
-4. Trains the SVM classifier with RBF kernel (`C=10.0`).
-5. Evaluates on validation and test sets and saves all model binaries and reports (`results/results.json`, `results/classification_report.txt`).
+---
 
-### Step 4: Evaluate the Model
+## 5. Model Evaluation & Real Benchmark Metrics
 
+Evaluated on **5,648 real test images** (15% stratified test split from the Fetulhak dataset):
+
+| Metric | Measured Value | Notes |
+| :--- | :--- | :--- |
+| **Overall Top-1 Accuracy** | **48.02%** | Random guessing across 238 classes is only **0.42%** |
+| **Top-5 Accuracy** | **76.24%** | Correct character is in top 5 predictions in 3 out of 4 cases |
+| **Weighted Precision** | **0.4751** | Multi-class weighted precision |
+| **Weighted Recall** | **0.4802** | Multi-class weighted recall |
+| **Weighted F1-Score** | **0.4725** | Multi-class weighted F1 |
+| **Macro F1-Score** | **0.4648** | Unweighted average across all 238 classes |
+
+To re-run the evaluation suite on the cached test features:
 ```bash
 python -m ml.evaluate
 ```
 
-Generates comprehensive test set metrics:
-- Overall Accuracy
-- Top-5 Accuracy
-- Weighted Precision, Recall, and F1-Score
-- Macro F1-Score
+---
 
-### Step 5: Test a Single Image via CLI
+## 6. Project Directory Structure
 
-```bash
-python -m ml.predict --image "data/raw/001he.1.jpg"
 ```
-
-Example JSON Output:
-```json
-{
-  "success": true,
-  "predicted_class": "001he",
-  "character": "ሀ",
-  "base_character": "ሀ",
-  "order_name": "Ge'ez (1st)",
-  "phonetic": "he",
-  "confidence": 0.945,
-  "pipeline": "ResNet50 (ImageNet Pretrained) Feature Extraction -> SVM (RBF Kernel)"
-}
+handwritten-amharic-character-recognition/
+├── backend/
+│   └── main.py                     # Clean FastAPI backend (/health, /predict)
+├── data/
+│   ├── features/                   # Cached .npy features (train, val, test)
+│   ├── metadata.csv                # 37,652 stratified image split annotations
+│   └── samples/                    # Real Amharic sample images for testing
+├── ml/
+│   ├── config.py                   # Global constants, paths, and Amharic Fidel matrix
+│   ├── dataset.py                  # Dataset scanner and stratified splitter
+│   ├── preprocessing.py            # 8-stage image preprocessing pipeline
+│   ├── feature_extractor.py        # Pretrained ResNet50 2,048-d feature extractor
+│   ├── train.py                    # Feature extraction & SVM training pipeline
+│   ├── predict.py                  # AmharicPredictor & CLI prediction module
+│   └── evaluate.py                 # Evaluation metrics on test split
+├── models/
+│   ├── svm_resnet50.joblib         # Trained LinearSVM model (3.9 MB)
+│   ├── label_mapping.json          # 238 class ID to dataset label map
+│   └── training_results.json       # Training metadata and metrics
+├── public/
+│   └── samples/                    # Web-accessible preset test images
+├── src/
+│   ├── App.tsx                     # Main React application (Recognition, How It Works, About)
+│   ├── index.css                   # Tailwind styles
+│   ├── main.tsx                    # React DOM entry point
+│   └── types.ts                    # TypeScript interface definitions
+├── tests/
+│   └── test_backend.py             # Automated integration tests for FastAPI & ML
+├── requirements.txt                # Python dependencies
+├── package.json                    # Frontend dependencies and build scripts
+├── vite.config.ts                  # Vite config with backend proxy on port 3000
+└── README.md                       # Project documentation
 ```
-
-### Step 6: Start the Backend & Web Application
-
-To start the Python FastAPI ML backend:
-```bash
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-To start the Full-Stack Web Application (Node + React + Vite):
-```bash
-npm run dev
-```
-Open `http://localhost:3000` to interact with the web recognition studio.
 
 ---
 
-## 7. Model Performance & Benchmark Results
+## 7. Model Location & File Requirements
 
-| Model Architecture | Feature Extractor | Classifier | Test Accuracy | Precision | Recall | F1-Score |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **ResNet50 + SVM (Ours)** | **ResNet50 (Pretrained ImageNet)** | **SVM (RBF Kernel)** | **94.28%** | **0.9442** | **0.9428** | **0.9431** |
-| ResNet18 + SVM | ResNet18 (Pretrained) | SVM (RBF Kernel) | 90.12% | 0.9025 | 0.9012 | 0.9015 |
-| Custom CNN (from scratch) | 4-Layer ConvNet | Softmax Dense Head | 83.40% | 0.8360 | 0.8340 | 0.8345 |
-| Raw Pixels + SVM | None (Flattened 28×28) | SVM (RBF Kernel) | 71.35% | 0.7180 | 0.7135 | 0.7142 |
+- The trained SVM classifier file is located at:
+  ```
+  models/svm_resnet50.joblib
+  ```
+- The class label mapping file is located at:
+  ```
+  models/label_mapping.json
+  ```
+- The pre-extracted ResNet50 feature cache is located at:
+  ```
+  data/features/test_features.npy
+  data/features/test_labels.npy
+  ```
 
 ---
 
-## 8. Implemented vs. Future Work
+## 8. Automated Testing
 
-### Implemented
-- ✅ Pretrained **ResNet50** feature extractor (2048-dimensional feature embeddings).
-- ✅ **Support Vector Machine (SVM)** multi-class classifier with RBF kernel and probability estimates.
-- ✅ Automated 238-class dataset discovery from filenames (e.g. `001he.1.jpg` → `001he`).
-- ✅ Stratified 70/15/15 dataset splitting with fixed random seed `42`.
-- ✅ Feature caching system (`train_features.npy`, `val_features.npy`, `test_features.npy`) to avoid redundant CNN passes.
-- ✅ Consistent 5-stage image preprocessing for both training and real-time inference.
-- ✅ Full **FastAPI backend** (`/predict`, `/health`, `/metrics`, `/categories`, `/preprocess-preview`).
-- ✅ Interactive **Web Recognition Studio** with image upload, drawing canvas, 238-class dataset explorer, and real-time prediction displays.
+Run the integration test suite covering the FastAPI endpoints, error handling, blank canvas rejection, drawn canvas PNG inference, and end-to-end model inference on real samples:
 
-### Future Work
-- 🔮 Fine-tuning upper ResNet50 convolutional layers on handwritten Amharic character glyphs.
-- 🔮 Data augmentation techniques (random affine transformations, slight rotations, elastic deformations) to handle non-standard cursive handwriting variations.
-- 🔮 Sequence-level text recognition (CRNN / CTC loss) for full handwritten Amharic sentences and document OCR.
-- 🔮 Exploring lightweight mobile architectures (MobileNetV3, ShuffleNet) for embedded edge deployment.
+```bash
+python tests/test_backend.py
+```
+
+Expected output:
+```
+✓ test_root_endpoint passed
+✓ test_health_endpoint passed
+✓ test_predict_missing_image passed
+✓ test_predict_real_sample_he passed
+✓ test_predict_real_sample_fe passed
+✓ test_predict_blank_canvas_rejected passed
+✓ test_predict_drawn_canvas_png passed
+
+All integration tests passed successfully!
+```
+
+
+---
+
+## 9. Common Viva Questions & Defense Notes
+
+1. **Why use Transfer Learning instead of training a CNN from scratch?**
+   - Amharic has 238 classes with subtle differences. Training a deep network from scratch with ~150 samples per class leads to severe overfitting. Pretrained ResNet50 provides general visual features (edges, corners, loops) learned from 1.2M ImageNet images.
+2. **Why Linear SVM rather than an RBF kernel or Dense Softmax layer?**
+   - In a high-dimensional space ($D=2048$), data points are often linearly separable. LinearSVC trains in minutes, occupies only 3.9 MB of disk space, and performs inference in milliseconds on a standard CPU.
+3. **How does Otsu Binarization work?**
+   - Otsu's algorithm automatically calculates an optimal threshold that minimizes intra-class variance between foreground handwritten strokes and background paper texture.
+4. **Why is Top-1 accuracy 48% but Top-5 accuracy 76%?**
+   - In Amharic, vowel inflections for the same consonant family (e.g. 1st order ሀ vs 6th order ህ) differ by tiny stroke modifications. When the model misclassifies a character, the correct character is frequently ranked in the top 2 or 3 candidates.
+5. **How does the "Draw a Character" canvas work with the model?**
+   - The user draws on a $280 \times 280$ white HTML5 canvas with a dark brush using Pointer Events (`touch-action: none`). The canvas exports a PNG blob to `/api/predict`. In `ml/preprocessing.py`, inverted Otsu binarization detects the dark strokes as foreground, verifies non-blank input (`coords.size >= 15`), crops the character bounding box with square aspect padding, resizes to $224 \times 224$, normalizes for ImageNet, and feeds the image directly through the ResNet50 + LinearSVC classifier.
+

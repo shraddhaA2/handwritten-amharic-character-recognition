@@ -92,37 +92,73 @@ def preprocess_image_stages(image_source):
     else:
         blurred = gray.copy()
 
-    # 4. Thresholding / Binarization (Otsu / Adaptive)
-    # Most Amharic dataset samples have dark character strokes on light background
-    if cv2 is not None:
-        _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    else:
-        # Simple Otsu-like threshold
-        mean_val = np.mean(blurred)
-        binary = np.where(blurred < mean_val, 255, 0).astype(np.uint8)
+    # 4. Polarity Detection & Binarization
+    # Determine background polarity from the 4 corner pixels
+    h, w = gray.shape
+    corners = [gray[0, 0], gray[0, w - 1], gray[h - 1, 0], gray[h - 1, w - 1]]
+    is_light_bg = float(np.mean(corners)) > 128.0
 
-    # Invert check: ensure character strokes are foreground (non-zero)
-    # If more than 50% is foreground, invert it back
-    if np.mean(binary > 0) > 0.65:
-        binary = cv2.bitwise_not(binary) if cv2 is not None else 255 - binary
+    # Domain adaptation: if image is from drawing canvas or light high-res photo/scan (>50px),
+    # project it into the native 28x28 dataset domain first to match training feature distribution.
+    adapted_canvas = False
+    if cv2 is not None and is_light_bg and (w > 50 or h > 50):
+        _, bin_canvas = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
+        img_28 = cv2.resize(bin_canvas, (28, 28), interpolation=cv2.INTER_AREA)
+        _, binary = cv2.threshold(img_28, 40, 255, cv2.THRESH_BINARY)
+        adapted_canvas = True
+
+    if not adapted_canvas:
+        if cv2 is not None:
+            if is_light_bg:
+                # Light background (canvas drawings, paper scans, photos):
+                # Invert so character strokes are 255 (white foreground) and background is 0 (black)
+                _, binary = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+            else:
+                # Dark background (native dataset images):
+                # Maintain exact compatibility with the cached training feature distribution
+                _, bin_inv = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+                if np.mean(bin_inv > 0) > 0.65:
+                    binary = cv2.bitwise_not(bin_inv)
+                else:
+                    binary = bin_inv
+        else:
+            # Fallback without OpenCV
+            mean_val = np.mean(blurred)
+            if is_light_bg:
+                binary = np.where(blurred < mean_val, 255, 0).astype(np.uint8)
+            else:
+                binary = np.where(blurred > mean_val, 255, 0).astype(np.uint8)
 
     # 5. Character Bounding Box Detection & Center-Padding
     # Find bounding box of foreground strokes
     coords = np.argwhere(binary > 20)
-    if coords.size > 0:
-        y0, x0 = coords.min(axis=0)
-        y1, x1 = coords.max(axis=0) + 1
-        
-        # Add safety margin
-        margin = max(2, int(0.08 * max(y1 - y0, x1 - x0)))
-        y0 = max(0, y0 - margin)
-        x0 = max(0, x0 - margin)
-        y1 = min(binary.shape[0], y1 + margin)
-        x1 = min(binary.shape[1], x1 + margin)
-        
-        char_crop = binary[y0:y1, x0:x1]
-    else:
-        char_crop = binary.copy()
+    if coords.size < 15:
+        raise ValueError("Image appears to be blank or has no detectable character strokes. Please draw or upload a clear character.")
+
+    y0, x0 = coords.min(axis=0)
+    y1, x1 = coords.max(axis=0) + 1
+    
+    # Add safety margin
+    margin = max(2, int(0.08 * max(y1 - y0, x1 - x0)))
+    y0 = max(0, y0 - margin)
+    x0 = max(0, x0 - margin)
+    y1 = min(binary.shape[0], y1 + margin)
+    x1 = min(binary.shape[1], x1 + margin)
+    
+    char_crop = binary[y0:y1, x0:x1]
+
+    # Adaptive stroke width normalization for high-resolution canvas inputs
+    # If a high-res image has thin vector brush strokes, mildly dilate to match dataset density
+    if cv2 is not None and is_light_bg:
+        crop_size = max(char_crop.shape[:2])
+        if crop_size > 50:
+            dist = cv2.distanceTransform(char_crop, cv2.DIST_L2, 5)
+            stroke_width_est = float(dist.max() * 2.0)
+            stroke_ratio = stroke_width_est / max(crop_size, 1)
+            if stroke_ratio < 0.22:
+                k_size = max(3, int(crop_size * 0.02) | 1)
+                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_size, k_size))
+                char_crop = cv2.dilate(char_crop, kernel, iterations=1)
 
     # Aspect-ratio preserving square padding
     ch, cw = char_crop.shape

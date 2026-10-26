@@ -1,26 +1,10 @@
 {
-  "model_architecture": "ResNet50 (ImageNet Pretrained) + SVM (RBF Kernel)",
-  "cnn_backbone": "ResNet50 (Torchvision weights=DEFAULT)",
-  "classifier": "Support Vector Machine (sklearn.svm.SVC)",
-  "kernel": "rbf",
-  "svm_c": 10.0,
-  "svm_gamma": "scale",
-  "feature_dimension": 2048,
-  "total_dataset_samples": 37804,
-  "classes_count": 238,
-  "train_samples": 26462,
-  "val_samples": 5671,
-  "test_samples": 5671,
-  "metrics": {
-    "test_accuracy": 0.9428,
-    "top5_accuracy": 0.9874,
-    "validation_accuracy": 0.9451,
-    "weighted_precision": 0.9442,
-    "weighted_recall": 0.9428,
-    "weighted_f1": 0.9431,
-    "macro_f1": 0.9389
-  },
-  "training_time_seconds": 182.4,
-  "device": "CUDA / PyTorch ResNet50 Feature Extractor",
-  "timestamp": "2026-08-18 11:15:00"
+  "model": "ResNet50 + SVM",
+  "test_samples": 5648,
+  "accuracy": 0.4802,
+  "top5_accuracy": 0.7624,
+  "precision_weighted": 0.4751,
+  "recall_weighted": 0.4802,
+  "f1_weighted": 0.4725,
+  "f1_macro": 0.4648
 }

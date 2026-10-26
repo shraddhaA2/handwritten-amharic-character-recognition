@@ -26,6 +26,7 @@ except ImportError:
 
 from .config import (
     SVM_MODEL_PATH,
+    LABEL_MAPPING_PATH,
     LABEL_ENCODER_PATH,
     TEST_FEATURES_PATH,
     TEST_LABELS_PATH,
@@ -68,7 +69,7 @@ def evaluate_model():
     p_weighted, r_weighted, f1_weighted, _ = precision_recall_fscore_support(y_test, y_pred, average="weighted", zero_division=0)
     p_macro, r_macro, f1_macro, _ = precision_recall_fscore_support(y_test, y_pred, average="macro", zero_division=0)
 
-    # Top-5 Accuracy if probabilities are available
+    # Top-5 Accuracy if probabilities or decision scores are available
     top5_acc = None
     if hasattr(svm_model, "predict_proba"):
         try:
@@ -77,8 +78,25 @@ def evaluate_model():
                 top5_acc = float(top_k_accuracy_score(y_test, proba, k=5))
         except Exception:
             pass
+    elif hasattr(svm_model, "decision_function"):
+        try:
+            scores = svm_model.decision_function(X_test)
+            if scores.shape[1] >= 5:
+                top5_acc = float(top_k_accuracy_score(y_test, scores, k=5))
+        except Exception:
+            pass
 
-    target_names = [str(c) for c in label_encoder.classes_] if label_encoder is not None else [f"Class_{i}" for i in range(len(np.unique(y_test)))]
+    if LABEL_MAPPING_PATH.exists():
+        try:
+            with open(LABEL_MAPPING_PATH, "r", encoding="utf-8") as f:
+                lm = json.load(f)
+            target_names = [lm.get(str(i), f"Class_{i}") for i in range(len(np.unique(y_test)))]
+        except Exception:
+            target_names = [f"Class_{i}" for i in range(len(np.unique(y_test)))]
+    elif label_encoder is not None:
+        target_names = [str(c) for c in label_encoder.classes_]
+    else:
+        target_names = [f"Class_{i}" for i in range(len(np.unique(y_test)))]
 
     print("\n" + "=" * 55)
     print("HANDWRITTEN AMHARIC CHARACTER RECOGNITION EVALUATION")

@@ -1,91 +1,43 @@
-export interface AmharicCategory {
-  index: number;
-  class_id: string;
+/**
+ * Type definitions for Handwritten Amharic Character Recognition
+ */
+
+export interface CandidatePrediction {
+  rank: number;
+  class_id: number;
   character: string;
+  class_label: string;
+  phonetic: string;
+  order_name: string;
   base_character: string;
-  base_id: string;
+  confidence: number;
+  decision_score: number;
+}
+
+export interface PredictionResponse {
+  success: boolean;
+  predicted_character: string;
+  class_id: number;
+  class_label: string;
+  standard_label: string;
+  base_character: string;
   order_number: number;
   order_name: string;
   phonetic: string;
-  description?: string;
-}
-
-export interface TopCandidate {
-  class_id: string;
-  character: string;
-  phonetic: string;
   confidence: number;
-}
-
-export interface FeatureSummary {
-  dimension: number;
-  norm: number;
-  sample_values: number[];
-}
-
-export interface PredictionResultData {
-  success: boolean;
-  predicted_class: string;
-  character: string;
-  base_character?: string;
-  order_name?: string;
-  phonetic?: string;
-  confidence: number;
+  decision_score: number;
+  top_candidates: CandidatePrediction[];
   pipeline: string;
-  top_candidates: TopCandidate[];
-  feature_summary?: FeatureSummary;
   error?: string;
 }
 
-export interface PreprocessingInfo {
-  stages: {
-    stage_1_grayscale: string;
-    stage_2_noise_binarization: string;
-    stage_3_centering_padding: string;
-    stage_4_resnet_input: string;
-  };
-  target_dimensions: {
-    raw_size: string;
-    preprocessed_size: string;
-    extracted_feature_vector: string;
-  };
-}
-
-export interface ModelMetrics {
-  test_accuracy: number;
-  top5_accuracy?: number;
-  validation_accuracy?: number;
-  weighted_precision: number;
-  weighted_recall: number;
-  weighted_f1: number;
-  macro_f1?: number;
-}
-
-export interface EvaluationResults {
-  model_architecture: string;
-  cnn_backbone: string;
-  classifier: string;
-  kernel?: string;
-  svm_c?: number;
-  svm_gamma?: string;
+export interface BackendHealth {
+  status: string;
+  service: string;
+  model_loaded: boolean;
+  model_file: string;
+  model_type: string;
+  feature_extractor: string;
   feature_dimension: number;
-  total_dataset_samples: number;
-  classes_count: number;
-  train_samples: number;
-  val_samples: number;
-  test_samples: number;
-  metrics: ModelMetrics;
-  training_time_seconds?: number;
-  device?: string;
-  timestamp?: string;
-}
-
-export interface ModelComparisonRow {
-  model: string;
-  backbone: string;
-  classifier: string;
-  accuracy: string;
-  precision: string;
-  recall: string;
-  f1: string;
+  total_classes: number;
 }

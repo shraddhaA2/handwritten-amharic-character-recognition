@@ -12,7 +12,7 @@ DATA_DIR = BASE_DIR / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
 MODELS_DIR = BASE_DIR / "models"
 RESULTS_DIR = BASE_DIR / "results"
-FEATURES_DIR = MODELS_DIR / "resnet50_features"
+FEATURES_DIR = DATA_DIR / "features"
 
 # Ensure directories exist
 for d in [DATA_DIR, RAW_DATA_DIR, MODELS_DIR, RESULTS_DIR, FEATURES_DIR]:
@@ -21,8 +21,7 @@ for d in [DATA_DIR, RAW_DATA_DIR, MODELS_DIR, RESULTS_DIR, FEATURES_DIR]:
 # Dataset paths
 METADATA_CSV = DATA_DIR / "metadata.csv"
 DATASET_DIRS = [
-    "Amharic Character Dataset 1",
-    "Amharic Character Dataset 2",
+    str(DATA_DIR / "samples"),
     str(RAW_DATA_DIR),
 ]
 
@@ -46,13 +45,15 @@ BATCH_SIZE = 64
 NUM_WORKERS = 2
 
 # SVM Hyperparameters
-SVM_KERNEL = "rbf"
-SVM_C = 10.0
-SVM_GAMMA = "scale"
-SVM_PROBABILITY = True
+SVM_KERNEL = "linear"
+SVM_C = 1.0
 
 # Model & Artifact Output Paths
-SVM_MODEL_PATH = MODELS_DIR / "svm_model.joblib"
+SVM_MODEL_PATH = MODELS_DIR / "svm_resnet50.joblib"
+if not SVM_MODEL_PATH.exists() and (MODELS_DIR / "svm_model.joblib").exists():
+    SVM_MODEL_PATH = MODELS_DIR / "svm_model.joblib"
+
+LABEL_MAPPING_PATH = MODELS_DIR / "label_mapping.json"
 LABEL_ENCODER_PATH = MODELS_DIR / "label_encoder.joblib"
 MODEL_METADATA_PATH = MODELS_DIR / "metadata.json"
 MAPPING_CONFIG_PATH = BASE_DIR / "ml" / "categories.json"
@@ -140,3 +141,62 @@ def load_categories_map():
         except Exception:
             pass
     return generate_default_categories_map()
+
+
+def get_character_info(identifier):
+    """
+    Resolves any class identifier (int 0..237, label string e.g. '225fe', or index string '0')
+    to complete Amharic character metadata.
+    """
+    class_idx = None
+    if isinstance(identifier, int):
+        class_idx = identifier
+    elif isinstance(identifier, str):
+        if identifier.isdigit():
+            class_idx = int(identifier)
+        elif len(identifier) >= 3 and identifier[:3].isdigit():
+            class_idx = int(identifier[:3]) - 1
+
+    order_names = [
+        "Ge'ez (1st)",
+        "Ka'eb (2nd)",
+        "Salis (3rd)",
+        "Rabi (4th)",
+        "Hamis (5th)",
+        "Sadis (6th)",
+        "Sabi (7th)",
+    ]
+
+    if class_idx is not None and 0 <= class_idx < 238:
+        family_idx = class_idx // 7
+        order_idx = class_idx % 7
+        base_id, base_char, glyphs, orders = AMHARIC_BASES[family_idx]
+        character = glyphs[order_idx]
+        phonetic = orders[order_idx]
+        order_name = order_names[order_idx]
+        class_number = class_idx + 1
+
+        return {
+            "class_id": class_idx,
+            "class_number": class_number,
+            "character": character,
+            "base_character": base_char,
+            "base_id": base_id,
+            "order_number": order_idx + 1,
+            "order_name": order_name,
+            "phonetic": phonetic,
+            "standard_label": f"{class_number:03d}{phonetic}",
+        }
+
+    return {
+        "class_id": class_idx if class_idx is not None else -1,
+        "class_number": (class_idx + 1) if class_idx is not None else -1,
+        "character": "?",
+        "base_character": "?",
+        "base_id": "unknown",
+        "order_number": 0,
+        "order_name": "Unknown",
+        "phonetic": str(identifier),
+        "standard_label": str(identifier),
+    }
+

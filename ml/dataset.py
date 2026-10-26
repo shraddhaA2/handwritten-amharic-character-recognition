@@ -58,7 +58,9 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 # ============================================================
 
 DATASET_DIRS = [
-    Path(r"C:\Users\ADMIN\Handwritten-Amharic-character-Dataset")
+    PROJECT_ROOT / "data" / "raw",
+    PROJECT_ROOT / "data" / "samples",
+    Path(r"C:\Users\ADMIN\Handwritten-Amharic-character-Dataset"),
 ]
 
 # ============================================================

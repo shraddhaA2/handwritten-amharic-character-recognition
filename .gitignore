@@ -43,3 +43,13 @@ data/raw/
 # Results
 results/*.png
 !results/confusion_matrix.png
+
+# Python test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Editor and OS files
+.vscode/
+.idea/
+Thumbs.db
