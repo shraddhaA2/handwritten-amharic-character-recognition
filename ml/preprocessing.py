@@ -5,6 +5,7 @@ Used consistently for both training and inference.
 import io
 import base64
 import numpy as np
+from pathlib import Path
 from PIL import Image
 
 try:
@@ -44,7 +45,8 @@ def load_image_to_numpy(image_source):
         img = image_source.convert("RGB")
         return np.array(img)
 
-    if isinstance(image_source, str):
+    if isinstance(image_source, (str, Path)):
+        image_source = str(image_source)
         # Check if base64 data URL
         if image_source.startswith("data:image"):
             header, encoded = image_source.split(",", 1)
@@ -99,12 +101,55 @@ def preprocess_image_stages(image_source):
     is_light_bg = float(np.mean(corners)) > 128.0
 
     # Domain adaptation: if image is from drawing canvas or light high-res photo/scan (>50px),
-    # project it into the native 28x28 dataset domain first to match training feature distribution.
+    # crop foreground strokes with aspect ratio preserved, then project into the native 28x28 dataset domain.
     adapted_canvas = False
     if cv2 is not None and is_light_bg and (w > 50 or h > 50):
+        # 1. Detect foreground strokes on full resolution canvas
         _, bin_canvas = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY_INV)
-        img_28 = cv2.resize(bin_canvas, (28, 28), interpolation=cv2.INTER_AREA)
-        _, binary = cv2.threshold(img_28, 40, 255, cv2.THRESH_BINARY)
+        
+        # 2. Reject blank or near-blank canvases
+        coords_highres = np.argwhere(bin_canvas > 20)
+        if coords_highres.size < 15:
+            raise ValueError("Image appears to be blank or has no detectable character strokes. Please draw or upload a clear character.")
+
+        # 3. Calculate foreground bounding box before downsampling
+        y0_hr, x0_hr = coords_highres.min(axis=0)
+        y1_hr, x1_hr = coords_highres.max(axis=0) + 1
+
+        # Add safety margin on high-res canvas while clamping to image bounds
+        m_hr = max(2, int(0.04 * max(y1_hr - y0_hr, x1_hr - x0_hr)))
+        y0_hr = max(0, y0_hr - m_hr)
+        x0_hr = max(0, x0_hr - m_hr)
+        y1_hr = min(h, y1_hr + m_hr)
+        x1_hr = min(w, x1_hr + m_hr)
+
+        char_crop_hr = bin_canvas[y0_hr:y1_hr, x0_hr:x1_hr]
+
+        # 4. Aspect-ratio preserving square padding
+        ch_hr, cw_hr = char_crop_hr.shape
+        side_hr = max(ch_hr, cw_hr, 1)
+        square_crop = np.zeros((side_hr, side_hr), dtype=np.uint8)
+        sy = (side_hr - ch_hr) // 2
+        sx = (side_hr - cw_hr) // 2
+        square_crop[sy:sy + ch_hr, sx:sx + cw_hr] = char_crop_hr
+
+        # 5. Resize normalized character to 26x26 inside native 28x28 frame
+        target_char_size = 26
+        char_resized = cv2.resize(square_crop, (target_char_size, target_char_size), interpolation=cv2.INTER_AREA)
+        _, char_bin = cv2.threshold(char_resized, 35, 255, cv2.THRESH_BINARY)
+        # Fallback threshold to safeguard very thin strokes from fading
+        if np.sum(char_bin > 20) < 8:
+            _, char_bin = cv2.threshold(char_resized, 15, 255, cv2.THRESH_BINARY)
+
+        img_28 = np.zeros((28, 28), dtype=np.uint8)
+        offset = (28 - target_char_size) // 2
+        img_28[offset:offset + target_char_size, offset:offset + target_char_size] = char_bin
+        binary = img_28
+
+        # Canonical 32x32 padding matching native training image feature scale
+        # In the training set, 28x28 images map to 32x32 with a 2-pixel margin:
+        padded_canvas = np.zeros((32, 32), dtype=np.uint8)
+        padded_canvas[2:30, 2:30] = img_28
         adapted_canvas = True
 
     if not adapted_canvas:
@@ -129,47 +174,34 @@ def preprocess_image_stages(image_source):
             else:
                 binary = np.where(blurred > mean_val, 255, 0).astype(np.uint8)
 
-    # 5. Character Bounding Box Detection & Center-Padding
-    # Find bounding box of foreground strokes
-    coords = np.argwhere(binary > 20)
-    if coords.size < 15:
-        raise ValueError("Image appears to be blank or has no detectable character strokes. Please draw or upload a clear character.")
+        # 5. Character Bounding Box Detection & Center-Padding
+        # Find bounding box of foreground strokes
+        coords = np.argwhere(binary > 20)
+        if coords.size < 15:
+            raise ValueError("Image appears to be blank or has no detectable character strokes. Please draw or upload a clear character.")
 
-    y0, x0 = coords.min(axis=0)
-    y1, x1 = coords.max(axis=0) + 1
-    
-    # Add safety margin
-    margin = max(2, int(0.08 * max(y1 - y0, x1 - x0)))
-    y0 = max(0, y0 - margin)
-    x0 = max(0, x0 - margin)
-    y1 = min(binary.shape[0], y1 + margin)
-    x1 = min(binary.shape[1], x1 + margin)
-    
-    char_crop = binary[y0:y1, x0:x1]
+        y0, x0 = coords.min(axis=0)
+        y1, x1 = coords.max(axis=0) + 1
+        
+        # Add safety margin
+        margin = max(2, int(0.08 * max(y1 - y0, x1 - x0)))
+        y0 = max(0, y0 - margin)
+        x0 = max(0, x0 - margin)
+        y1 = min(binary.shape[0], y1 + margin)
+        x1 = min(binary.shape[1], x1 + margin)
+        
+        char_crop = binary[y0:y1, x0:x1]
 
-    # Adaptive stroke width normalization for high-resolution canvas inputs
-    # If a high-res image has thin vector brush strokes, mildly dilate to match dataset density
-    if cv2 is not None and is_light_bg:
-        crop_size = max(char_crop.shape[:2])
-        if crop_size > 50:
-            dist = cv2.distanceTransform(char_crop, cv2.DIST_L2, 5)
-            stroke_width_est = float(dist.max() * 2.0)
-            stroke_ratio = stroke_width_est / max(crop_size, 1)
-            if stroke_ratio < 0.22:
-                k_size = max(3, int(crop_size * 0.02) | 1)
-                kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k_size, k_size))
-                char_crop = cv2.dilate(char_crop, kernel, iterations=1)
-
-    # Aspect-ratio preserving square padding
-    ch, cw = char_crop.shape
-    max_side = max(ch, cw, 1)
-    # Pad to square with generous centered border
-    pad_total = int(max_side * 1.15)
-    padded_canvas = np.zeros((pad_total, pad_total), dtype=np.uint8)
-    
-    offset_y = (pad_total - ch) // 2
-    offset_x = (pad_total - cw) // 2
-    padded_canvas[offset_y:offset_y + ch, offset_x:offset_x + cw] = char_crop
+        # Aspect-ratio preserving square padding
+        ch, cw = char_crop.shape
+        max_side = max(ch, cw, 1)
+        # Pad to square with generous centered border
+        pad_total = int(max_side * 1.15)
+        padded_canvas = np.zeros((pad_total, pad_total), dtype=np.uint8)
+        
+        offset_y = (pad_total - ch) // 2
+        offset_x = (pad_total - cw) // 2
+        padded_canvas[offset_y:offset_y + ch, offset_x:offset_x + cw] = char_crop
 
     # 6. Resize to 224 × 224
     if cv2 is not None:
